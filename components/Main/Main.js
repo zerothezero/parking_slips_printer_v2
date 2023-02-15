@@ -1,47 +1,97 @@
-import {format} from 'date-fns';
-import {th} from 'date-fns/locale';
-import {Button, Icon, Text} from 'native-base';
-import React, {useEffect, useState} from 'react';
-import {StyleSheet, View, DeviceEventEmitter, PermissionsAndroid, Platform} from 'react-native';
-import {BluetoothEscposPrinter, BluetoothManager} from '@brooons/react-native-bluetooth-escpos-printer';
-import {Col, Grid, Row} from 'react-native-easy-grid';
-import {MenuProvider} from 'react-native-popup-menu';
-// import {openDatabase} from 'react-native-sqlite-storage';
+import { format } from 'date-fns';
+import { th } from 'date-fns/locale';
+import { Button, Icon, Text } from 'native-base';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, View, DeviceEventEmitter, PermissionsAndroid, Platform } from 'react-native';
+import { BluetoothEscposPrinter, BluetoothManager } from '@brooons/react-native-bluetooth-escpos-printer';
+import { Col, Grid, Row } from 'react-native-easy-grid';
+import { MenuProvider } from 'react-native-popup-menu';
 import SQLite from 'react-native-sqlite-storage';
 
-import {footer1 as slipFooter1, footer2 as slipFooter2, header as slipHeader} from '../../app.json';
-import {getError, itemToArray, toast, dt_now} from '../helper';
+import { footer1 as slipFooter1, footer2 as slipFooter2, header as slipHeader } from '../../app.json';
+import { getError, itemToArray, toast, dt_now } from '../helper';
 import MainCP from './MainCP';
 import MainInfo from './MainInfo';
 import MainPos from './MainPos';
 import MainRecentCars from './MainRecentCars';
 import RNFS from "react-native-fs";
 
-const database_name = 'parking_slips.sqlite3';
+SQLite.enablePromise(false);
+// const database_name = 'parking_slips.sqlite3';
 
 // const address = '02:04:36:C7:65:7A'; // MTP-II 02:04:36:C7:65:7A
 
 const Main = () => {
-    let [plate, setPlate] = useState('');
+    // let [plate, setPlate] = useState('');
     let [cars, setCars] = useState(0);
     let [listCars, setListCars] = useState([]);
     let [connecting, setConnecting] = useState(false);
     let [connected, setConnected] = useState(false); // true if connected to printer - TODO: change back to false for production
-    let db;
     // v2
     const pathDir = `/storage/emulated/0/.psb-config`;
-    const path = `${pathDir}/parking_slips_printer.txt`;
+    const pathName = `parking_slip_printer.txt`;
+    const pathNameDb = `parking_slip_printer.db`;
+    const path = `${pathDir}/${pathName}`;
+    const pathDb = `${pathDir}/${pathNameDb}`;
     const [address, setAddress] = useState('');
+    let db;
 
-    async function config() {
+    const config = async () => {
         await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE)
+        // create directory .psb-config
+        await RNFS.mkdir(pathDir);
+
+        // check files
         const isFileExists = await RNFS.exists(path);
-        if (!isFileExists) {
-            await RNFS.mkdir(pathDir);
-            await RNFS.writeFile(path, '', 'utf8');
+        const isDbExists = await RNFS.exists(pathDb);
+        if (!isFileExists || !isDbExists) {
+            if (!isFileExists) {
+                await RNFS.writeFile(path, '', 'utf8');
+            }
+            if (!isDbExists) {
+                await RNFS.writeFile(pathDb, '', 'utf8');
+            }
         } else {
-            const text = await RNFS.readFile(path, 'utf8');
-            setAddress(text);
+            // load config
+            await getAddress();
+        }
+    }
+
+    const getAddress = async () => {
+        const text = await RNFS.readFile(path, 'utf8');
+        setAddress(text);
+    }
+
+    const dbOpen = async () => {
+        if (!db) {
+            db = SQLite.openDatabase(
+                {
+                    name: pathDb,
+                    createFromLocation: pathDb
+                },
+                () => {
+                    try {
+                        db.executeSql('CREATE TABLE IF NOT EXISTS "parking" ( "id" INTEGER, "plate" TEXT, "created" INTEGER NOT NULL DEFAULT (strftime(\'%s\', \'now\') || substr(strftime(\'%f\', \'now\'), 4)), "created_by" TEXT NOT NULL, "modified" INTEGER, "modified_by" TEXT, PRIMARY KEY("id" AUTOINCREMENT) );');
+                        getCountCars();
+                        getRecentCars();
+                    } catch (e) {
+                        toast(getError(e));
+                    }
+                },
+                (error) => {
+                    toast(getError(error));
+                }
+            );
+        }
+    }
+
+    function dbClose() {
+        try {
+            if (db) {
+                db.close();
+            }
+        } catch (e) {
+            toast(getError(e));
         }
     }
 
@@ -61,60 +111,49 @@ const Main = () => {
                 setConnected(false);
             })
 
-            config().then();
+            const init = async () => {
+                try {
+                    await dbOpen();
+                    await config();
+                    if (!connected) {
+                        await connectPrinter();
+                    }
+                } catch (e) {
+                    toast(getError(e));
+                }
+            }
+            init().then(() => { toast('--- Ready ---')});
         }
-        if (!connected) {
-            connectPrinter();
-        }
-        opendb().then();
 
         return () => {
-            if (db) db.close();
+            dbClose();
         }
     }, []);
 
-    const opendb = async () => {
+    const connectPrinter = async () => {
         try {
-            db = await SQLite.openDatabase(
-                {name: database_name, createFromLocation: `${path}/${database_name}`},
-                () => {
-                },
-                (error) => {
-                    toast(getError(error));
-                }
-            );
-            // this.db = await SQLite.openDatabase(database_name, database_version, database_displayname, -1);
-            await getCountCars();
-            await getRecentCars();
+            await getAddress();
+            setConnecting(true);
+            BluetoothManager.connect(address)
+                .then(
+                    () => { setConnected(true); },
+                    (e) => {
+                        toast(getError(e));
+                        setConnected(false);
+                    }
+                )
+                .catch(
+                    (e) => {
+                        toast(getError(e));
+                        setConnected(false);
+                    }
+                )
+                .finally(
+                    () => { setConnecting(false); }
+                );
         } catch (e) {
             toast(getError(e));
         }
-    };
-
-    const connectPrinter = () => {
-        config().then();
-        setConnecting(true);
-        BluetoothManager.connect(address)
-            .then(
-                () => {
-                    setConnected(true);
-                },
-                (e) => {
-                    toast(getError(e));
-                    setConnected(false);
-                }
-            )
-            .catch(
-                (e) => {
-                    toast(getError(e));
-                    setConnected(false);
-                }
-            )
-            .finally(
-                () => {
-                    setConnecting(false);
-                }
-            );
     };
 
     const sql_today = () => {
@@ -185,7 +224,7 @@ const Main = () => {
     };
 
     const printslip = async (plate) => {
-        setPlate(plate)
+        // setPlate(plate);
         if (plate) {
             db.transaction((tx) => {
                 const sql = 'insert into parking(plate, created_by) values (?,?)';
@@ -208,12 +247,6 @@ const Main = () => {
         }
     };
 
-    const reprintslip = async (plate) => {
-        if (plate) {
-            await print(plate);
-        }
-    };
-
     const print = async (plate = '') => {
         const opts = {widthtimes: 0, heigthtimes: 0, fonttype: 0};
         const opts2 = {widthtimes: 0, heigthtimes: 1, fonttype: 0};
@@ -232,6 +265,12 @@ const Main = () => {
         await BluetoothEscposPrinter.printPic(slipFooter2, {width: 250, left: 60});
         // await BluetoothEscposPrinter.printText('-------------------------------\r\n\r\n', opts);
         await BluetoothEscposPrinter.printText('\r\n\r\n\r\n', opts);
+    };
+
+    const reprintslip = async (plate) => {
+        if (plate) {
+            await print(plate);
+        }
     };
 
     return (
@@ -256,7 +295,9 @@ const Main = () => {
                                             alignContent: 'center',
                                             justifyContent: 'center',
                                             width: '100%'
-                                        }}>
+                                        }}
+                                        colorScheme={connected ? 'success' : 'primary'}
+                                >
                                     <Icon name="printer" type={'SimpleLineIcons'} style={{fontSize: 20}}/>
                                     <Text style={{
                                         color: 'white',
@@ -276,9 +317,9 @@ const Main = () => {
                 </Row>
                 <Row size={1.2}>
                     <Col>
-                        <MainPos printslip={printslip}
-                                 connected={connected}
-                                 content={StyleSheet.flatten([defaultStyles.content, defaultStyles.content_center])}/>
+                        {/*<MainPos printslip={printslip}*/}
+                        {/*         connected={connected}*/}
+                        {/*         content={StyleSheet.flatten([defaultStyles.content, defaultStyles.content_center])}/>*/}
                     </Col>
                 </Row>
                 <Row size={2}>
@@ -292,9 +333,6 @@ const Main = () => {
     );
 }
 
-// const pastel_yellow = {backgroundColor: '#fcffc9'};
-// const pastel_green = {backgroundColor: '#c7ffc8'};
-// const green = {backgroundColor: '#28b672'};
 const defaultStyles = StyleSheet.create({
     content: {
         backgroundColor: '#fcffc9',
