@@ -33,7 +33,7 @@ const Main = () => {
     const pathNameDb = `parking_slip_printer.db`;
     const path = `${pathDir}/${pathName}`;
     const pathDb = `${pathDir}/${pathNameDb}`;
-    const [address, setAddress] = useState('');
+    let [address, setAddress] = useState('');
     let db;
 
     const config = async () => {
@@ -58,11 +58,11 @@ const Main = () => {
     }
 
     const getAddress = async () => {
-        const text = await RNFS.readFile(path, 'utf8');
-        setAddress(text);
+        const result = await RNFS.readFile(path, 'utf8');
+        setAddress(result);
     }
 
-    const dbOpen = async () => {
+    const dbOpen = () => {
         if (!db) {
             db = SQLite.openDatabase(
                 {
@@ -102,6 +102,7 @@ const Main = () => {
                 setConnected(true);
             })
             DeviceEventEmitter.addListener(BluetoothManager.EVENT_CONNECTION_LOST, () => {
+                toast('Connection Lost');
                 setConnecting(false);
                 setConnected(false);
             })
@@ -113,9 +114,9 @@ const Main = () => {
 
             const init = async () => {
                 try {
-                    await dbOpen();
+                    dbOpen();
                     await config();
-                    if (!connected) {
+                    if (!connected && address) {
                         await connectPrinter();
                     }
                 } catch (e) {
@@ -128,11 +129,11 @@ const Main = () => {
         return () => {
             dbClose();
         }
-    }, []);
+    }, [address]);
 
     const connectPrinter = async () => {
         try {
-            await getAddress();
+            await config();
             setConnecting(true);
             BluetoothManager.connect(address)
                 .then(
@@ -166,32 +167,34 @@ const Main = () => {
     };
 
     const getCountCars = () => {
-        db.transaction(
-            (tx) => {
-                const sql = 'select count(id) as "cars" from parking where created >= ? and created <= ?';
-                const args = sql_today();
-                tx.executeSql(
-                    sql,
-                    args,
-                    (tx, {rows}) => {
-                        const arrRows = itemToArray(rows);
-                        if (arrRows.length < 1) {
+        if (db) {
+            db.transaction(
+                (tx) => {
+                    const sql = 'select count(id) as "cars" from parking where created >= ? and created <= ?';
+                    const args = sql_today();
+                    tx.executeSql(
+                        sql,
+                        args,
+                        (tx, {rows}) => {
+                            const arrRows = itemToArray(rows);
+                            if (arrRows.length < 1) {
+                                setCars(-1);
+                            } else {
+                                setCars(arrRows[0].cars);
+                            }
+                        },
+                        (error) => {
+                            toast(getError(error));
                             setCars(-1);
-                        } else {
-                            setCars(arrRows[0].cars);
                         }
-                    },
-                    (error) => {
-                        toast(getError(error));
-                        setCars(-1);
-                    }
-                );
-            },
-            (error) => {
-                toast(getError(error));
-                setCars(-1);
-            }
-        );
+                    );
+                },
+                (error) => {
+                    toast(getError(error));
+                    setCars(-1);
+                }
+            );
+        }
     };
 
     const getRecentCars = () => {
@@ -279,7 +282,8 @@ const Main = () => {
                 <Row size={0.8}>
                     <Col size={1.8}>
                         <MainInfo
-                            content={StyleSheet.flatten([defaultStyles.content, defaultStyles.content_left])}/>
+                            content={StyleSheet.flatten([defaultStyles.content, defaultStyles.content_left])}
+                        />
                     </Col>
                     <Col size={1}>
                         <Row size={1}>
@@ -337,7 +341,7 @@ const defaultStyles = StyleSheet.create({
     content: {
         backgroundColor: '#fcffc9',
         flex: 1,
-        justifyContent: 'center',
+        justifyContent: 'space-evenly',
         alignItems: 'center',
     },
     content_left: {

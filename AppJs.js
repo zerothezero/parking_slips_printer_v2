@@ -11,6 +11,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { NativeBaseProvider } from 'native-base';
 
 import Main from './components/Main/Main';
+import { StyleSheet } from "react-native";
 
 // SQLite.DEBUG(true);
 const AppJs = () => {
@@ -76,7 +77,7 @@ const AppJs = () => {
     return <>
         <NativeBaseProvider>
             <SafeAreaProvider>
-                <SafeAreaView>
+                <SafeAreaView style={StyleSheet.flatten([defaultStyles.view, green])}>
                     {/*<Center height={'100%'}>*/}
                     {/*    <Button width={'50%'}*/}
                     {/*            colorScheme={printer ? ("primary") : 'danger'}*/}
@@ -93,11 +94,18 @@ const AppJs = () => {
                     {/*        {printer || 'ตั้งค่าเครื่องพิมพ์ก่อน'}*/}
                     {/*    </Button>*/}
                     {/*</Center>*/}
-                    <Main />
+                    <Main/>
                 </SafeAreaView>
             </SafeAreaProvider>
         </NativeBaseProvider>
     </>
 }
+
+const green = {backgroundColor: '#28b672'};
+const defaultStyles = StyleSheet.create({
+    view: {
+        flex: 1,
+    },
+});
 
 export default AppJs;

@@ -1,14 +1,15 @@
-import {format} from 'date-fns';
-import {th} from 'date-fns/locale';
-import React, {useEffect, useState} from 'react';
-import {View} from 'react-native';
-import {Text} from 'native-base';
+import { format } from 'date-fns';
+import { th } from 'date-fns/locale';
+import React, { useEffect, useState } from 'react';
+import { View } from 'react-native';
+import { Text } from 'native-base';
 
 const MainInfo = (props) => {
     const textStyle = {
-        fontSize: 30,
+        fontSize: 36,
         fontWeight: 'bold',
         flexWrap: 'wrap',
+        paddingTop: 20,
     };
 
     let [date, setDate] = useState('');
