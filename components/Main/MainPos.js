@@ -55,7 +55,6 @@ const MainPos = (props) => {
                         <Text style={{fontSize: 36, fontWeight: 'bold', textAlignVertical: 'center'}}>Print</Text>
                     </Button>
                 </Row>
-                {/*<Row size={5}/>*/}
             </Grid>
         </View>
     );

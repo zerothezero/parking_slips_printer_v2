@@ -1,7 +1,8 @@
-import React, {useState} from 'react';
-import {TouchableOpacity, View} from 'react-native';
-import {Text, Icon} from 'native-base';
-import {formatNumber} from '../helper';
+import React, { useState } from 'react';
+import { TouchableOpacity, View } from 'react-native';
+import { Text } from 'native-base';
+import { formatNumber } from '../helper';
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
 const MainCP = (props) => {
     let [isVisible, setIsVisible] = useState(false);
@@ -18,21 +19,26 @@ const MainCP = (props) => {
     };
 
     return (
-        <TouchableOpacity activeOpacity={1} onPressIn={show} onPressOut={hide} style={props.content}>
-            <View>
-                {
-                    isVisible && (
-                        <>
-                            <Icon name='car-multiple' type={'MaterialCommunityIcons'} style={{alignSelf: 'center'}}/>
-                            <Text style={{
-                                fontSize: 24,
+        <TouchableOpacity activeOpacity={1} onPressIn={show} onPressOut={hide}
+                          style={[props.content, {flexDirection: 'row', justifyContent: 'flex-start'}]}>
+            {
+                isVisible && (
+                    <>
+                        <Icon name="car-multiple" size={30} style={{paddingLeft: '10%'}} />
+                        <Text
+                            alignSelf={'center'}
+                            style={{
+                                fontSize: 30,
                                 fontWeight: 'bold',
-                                alignSelf: 'center'
-                            }}>{formatNumber(cars.toString())}</Text>
-                        </>
-                    )
-                }
-            </View>
+                                paddingTop: 15,
+                                paddingLeft: '10%'
+                            }}
+                        >
+                            {formatNumber(cars.toString())}
+                        </Text>
+                    </>
+                )
+            }
         </TouchableOpacity>
     );
 }

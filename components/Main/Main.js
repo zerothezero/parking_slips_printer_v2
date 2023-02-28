@@ -1,7 +1,7 @@
 import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
-import { Button, Icon, Text } from 'native-base';
-import React, { useEffect, useState } from 'react';
+import { Button, Text } from 'native-base';
+import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View, DeviceEventEmitter, PermissionsAndroid, Platform } from 'react-native';
 import { BluetoothEscposPrinter, BluetoothManager } from '@brooons/react-native-bluetooth-escpos-printer';
 import { Col, Grid, Row } from 'react-native-easy-grid';
@@ -15,14 +15,9 @@ import MainInfo from './MainInfo';
 import MainPos from './MainPos';
 import MainRecentCars from './MainRecentCars';
 import RNFS from "react-native-fs";
-
-SQLite.enablePromise(false);
-// const database_name = 'parking_slips.sqlite3';
-
-// const address = '02:04:36:C7:65:7A'; // MTP-II 02:04:36:C7:65:7A
+import Icon from "react-native-vector-icons/SimpleLineIcons"
 
 const Main = () => {
-    // let [plate, setPlate] = useState('');
     let [cars, setCars] = useState(0);
     let [listCars, setListCars] = useState([]);
     let [connecting, setConnecting] = useState(false);
@@ -33,10 +28,9 @@ const Main = () => {
     const pathNameDb = `parking_slip_printer.db`;
     const path = `${pathDir}/${pathName}`;
     const pathDb = `${pathDir}/${pathNameDb}`;
-    let [address, setAddress] = useState('');
     let db;
 
-    const config = async () => {
+    const config = useCallback(async () => {
         await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE)
         // create directory .psb-config
         await RNFS.mkdir(pathDir);
@@ -51,16 +45,12 @@ const Main = () => {
             if (!isDbExists) {
                 await RNFS.writeFile(pathDb, '', 'utf8');
             }
-        } else {
-            // load config
-            await getAddress();
         }
-    }
+    }, []);
 
-    const getAddress = async () => {
-        const result = await RNFS.readFile(path, 'utf8');
-        setAddress(result);
-    }
+    const getAddress = useMemo(async () => {
+        return await RNFS.readFile(path, 'utf8');
+    }, [path]);
 
     const dbOpen = () => {
         if (!db) {
@@ -102,14 +92,16 @@ const Main = () => {
                 setConnected(true);
             })
             DeviceEventEmitter.addListener(BluetoothManager.EVENT_CONNECTION_LOST, () => {
-                toast('Connection Lost');
+                // toast('Connection Lost');
                 setConnecting(false);
                 setConnected(false);
+                setTimeout(() => { }, 5000);
             })
             DeviceEventEmitter.addListener(BluetoothManager.EVENT_UNABLE_CONNECT, () => {
-                toast('Unable to Connect Printer');
+                // toast('Unable to Connect Printer');
                 setConnecting(false);
                 setConnected(false);
+                setTimeout(() => { }, 5000);
             })
 
             const init = async () => {
@@ -123,19 +115,19 @@ const Main = () => {
                     toast(getError(e));
                 }
             }
-            init().then(() => { toast('--- Ready ---')});
+            init().then(() => { toast('--- Ready ---') });
         }
 
         return () => {
             dbClose();
         }
-    }, [address]);
+    }, []);
 
-    const connectPrinter = async () => {
+    const connectPrinter = useCallback(async () => {
         try {
-            await config();
             setConnecting(true);
-            BluetoothManager.connect(address)
+            const address = await getAddress();
+            address && BluetoothManager.connect(address)
                 .then(
                     () => { setConnected(true); },
                     (e) => {
@@ -155,18 +147,18 @@ const Main = () => {
         } catch (e) {
             toast(getError(e));
         }
-    };
+    }, [address]);
 
-    const sql_today = () => {
+    const sql_today = useMemo(() => {
         const _dateStart = new Date().toDateString() + ' 00:00:00',
             _dateEnd = new Date().toDateString() + ' 23:59:59';
-        const start = format(new Date(_dateStart), 'TT', {locale: th}),
-            end = format(new Date(_dateEnd), 'TT', {locale: th});
+        const start = format(new Date(_dateStart), 'TT', { locale: th }),
+            end = format(new Date(_dateEnd), 'TT', { locale: th });
 
         return [start, end];
-    };
+    }, [start, end]);
 
-    const getCountCars = () => {
+    const getCountCars = useCallback(() => {
         if (db) {
             db.transaction(
                 (tx) => {
@@ -175,8 +167,9 @@ const Main = () => {
                     tx.executeSql(
                         sql,
                         args,
-                        (tx, {rows}) => {
+                        (tx, { rows }) => {
                             const arrRows = itemToArray(rows);
+                            console.debug(arrRows);
                             if (arrRows.length < 1) {
                                 setCars(-1);
                             } else {
@@ -195,9 +188,9 @@ const Main = () => {
                 }
             );
         }
-    };
+    }, []);
 
-    const getRecentCars = () => {
+    const getRecentCars = useCallback(() => {
         const sql = 'select * from parking where created >= ? and created <= ? order by id desc limit 5';
         const args = sql_today();
 
@@ -206,7 +199,7 @@ const Main = () => {
                 tx.executeSql(
                     sql,
                     args,
-                    (tx, {rows}) => {
+                    (tx, { rows }) => {
                         const arrRows = itemToArray(rows);
                         if (arrRows.length < 1) {
                             setListCars([]);
@@ -224,10 +217,9 @@ const Main = () => {
                 setCars(-1);
             }
         );
-    };
+    }, []);
 
-    const printslip = async (plate) => {
-        // setPlate(plate);
+    const printslip = useCallback(async (plate) => {
         if (plate) {
             db.transaction((tx) => {
                 const sql = 'insert into parking(plate, created_by) values (?,?)';
@@ -235,7 +227,7 @@ const Main = () => {
                 tx.executeSql(
                     sql,
                     [plate, created_by],
-                    (tx, {rowsAffected}) => {
+                    (tx, { rowsAffected }) => {
                         if (rowsAffected > 0) {
                             print(plate);
                         }
@@ -248,14 +240,14 @@ const Main = () => {
                 );
             });
         }
-    };
+    }, [plate]);
 
-    const print = async (plate = '') => {
-        const opts = {widthtimes: 0, heigthtimes: 0, fonttype: 0};
-        const opts2 = {widthtimes: 0, heigthtimes: 1, fonttype: 0};
+    const print = useCallback(async (plate = '') => {
+        const opts = { widthtimes: 0, heigthtimes: 0, fonttype: 0 };
+        const opts2 = { widthtimes: 0, heigthtimes: 1, fonttype: 0 };
         await BluetoothEscposPrinter.printerInit();
         await BluetoothEscposPrinter.setBlob(0);
-        await BluetoothEscposPrinter.printPic(slipHeader, {width: 180, left: 90});
+        await BluetoothEscposPrinter.printPic(slipHeader, { width: 180, left: 90 });
         await BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.CENTER);
         await BluetoothEscposPrinter.printText('07.00 - 15.00\r\n', opts);
         await BluetoothEscposPrinter.printText('--------------------------------\r\n', opts);
@@ -264,17 +256,17 @@ const Main = () => {
         await BluetoothEscposPrinter.printColumn([16, 16], [BluetoothEscposPrinter.ALIGN.LEFT, BluetoothEscposPrinter.ALIGN.RIGHT], ['Plate :', plate], opts2);
         await BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.CENTER);
         await BluetoothEscposPrinter.printText('--------------------------------\r\n', opts);
-        await BluetoothEscposPrinter.printPic(slipFooter1, {width: 250, left: 60});
-        await BluetoothEscposPrinter.printPic(slipFooter2, {width: 250, left: 60});
+        await BluetoothEscposPrinter.printPic(slipFooter1, { width: 250, left: 60 });
+        await BluetoothEscposPrinter.printPic(slipFooter2, { width: 250, left: 60 });
         // await BluetoothEscposPrinter.printText('-------------------------------\r\n\r\n', opts);
         await BluetoothEscposPrinter.printText('\r\n\r\n\r\n', opts);
-    };
+    }, [plate]);
 
-    const reprintslip = async (plate) => {
+    const reprintslip = useCallback(async (plate) => {
         if (plate) {
             await print(plate);
         }
-    };
+    }, [plate]);
 
     return (
         <MenuProvider>
@@ -289,23 +281,28 @@ const Main = () => {
                         <Row size={1}>
                             <View style={StyleSheet.flatten([defaultStyles.content, defaultStyles.content_right])}>
                                 <Button full
-                                        disabled={connecting || connected}
-                                        onPress={connectPrinter}
-                                        iconLeft
-                                        style={{
-                                            flex: 1,
-                                            alignSelf: 'center',
-                                            alignItems: 'center',
-                                            alignContent: 'center',
-                                            justifyContent: 'center',
-                                            width: '100%'
-                                        }}
-                                        colorScheme={connected ? 'success' : 'primary'}
+                                    isDisabled={connecting || connected}
+                                    _disabled={{ opacity: 0.6 }}
+                                    onPress={connectPrinter}
+                                    iconLeft
+                                    style={{
+                                        flex: 1,
+                                        flexDirection: 'column',
+                                        width: '100%'
+                                    }}
+                                    colorScheme={connected ? 'success' : 'warning'}
+                                    leftIcon={
+                                        <Icon name="printer"
+                                            style={{ fontSize: 20, fontWeight: 'bold', color: 'white' }}
+                                        />
+                                    }
                                 >
-                                    <Icon name="printer" type={'SimpleLineIcons'} style={{fontSize: 20}}/>
                                     <Text style={{
                                         color: 'white',
-                                        fontSize: 12
+                                        fontSize: 20,
+                                        fontWeight: 'bold',
+                                        paddingTop: 5,
+                                        paddingLeft: '5%'
                                     }}>
                                         {connected ? 'เชื่อมต่อแล้ว' : 'เชื่อมต่อ'}
                                     </Text>
@@ -314,35 +311,37 @@ const Main = () => {
                         </Row>
                         <Row size={1}>
                             <MainCP cars={cars}
-                                    getCars={getCountCars}
-                                    content={StyleSheet.flatten([defaultStyles.content, defaultStyles.content_right])}/>
+                                getCars={getCountCars}
+                                content={StyleSheet.flatten([defaultStyles.content, defaultStyles.content_right])} />
                         </Row>
                     </Col>
                 </Row>
                 <Row size={1.2}>
                     <Col>
-                        {/*<MainPos printslip={printslip}*/}
-                        {/*         connected={connected}*/}
-                        {/*         content={StyleSheet.flatten([defaultStyles.content, defaultStyles.content_center])}/>*/}
+                        <MainPos printslip={printslip}
+                            connected={connected}
+                            content={StyleSheet.flatten([defaultStyles.content, defaultStyles.content_center])}
+                        />
                     </Col>
                 </Row>
                 <Row size={2}>
                     <MainRecentCars onReprint={reprintslip}
-                                    plates={listCars}
-                                    connected={connected}
-                                    style={StyleSheet.flatten([defaultStyles.content, defaultStyles.content_bottom])}/>
+                        plates={listCars}
+                        connected={connected}
+                        style={StyleSheet.flatten([defaultStyles.content, defaultStyles.content_bottom])} />
                 </Row>
             </Grid>
         </MenuProvider>
     );
 }
 
-const defaultStyles = StyleSheet.create({
+const defaultStyles = useMemo(() => StyleSheet.create({
     content: {
         backgroundColor: '#fcffc9',
         flex: 1,
         justifyContent: 'space-evenly',
         alignItems: 'center',
+        borderWidth: 1
     },
     content_left: {
         marginTop: 5,
@@ -366,6 +365,6 @@ const defaultStyles = StyleSheet.create({
     view: {
         flex: 1,
     },
-});
+}), []);
 
 export default Main;
