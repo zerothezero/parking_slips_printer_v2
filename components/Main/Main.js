@@ -1,7 +1,7 @@
-import { format } from 'date-fns';
+import { add, format } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { Button, Text } from 'native-base';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { StyleSheet, View, DeviceEventEmitter, PermissionsAndroid, Platform } from 'react-native';
 import { BluetoothEscposPrinter, BluetoothManager } from '@brooons/react-native-bluetooth-escpos-printer';
 import { Col, Grid, Row } from 'react-native-easy-grid';
@@ -17,51 +17,34 @@ import MainRecentCars from './MainRecentCars';
 import RNFS from "react-native-fs";
 import Icon from "react-native-vector-icons/SimpleLineIcons"
 
+// v2
+const pathDir = `/storage/emulated/0/.psb-config`;
+const pathName = `parking_slip_printer.txt`;
+const pathNameDb = `parking_slip_printer.db`;
+const path = `${pathDir}/${pathName}`;
+const pathDb = `${pathDir}/${pathNameDb}`;
+
 const Main = () => {
     let [cars, setCars] = useState(0);
     let [listCars, setListCars] = useState([]);
     let [connecting, setConnecting] = useState(false);
     let [connected, setConnected] = useState(false); // true if connected to printer - TODO: change back to false for production
-    // v2
-    const pathDir = `/storage/emulated/0/.psb-config`;
-    const pathName = `parking_slip_printer.txt`;
-    const pathNameDb = `parking_slip_printer.db`;
-    const path = `${pathDir}/${pathName}`;
-    const pathDb = `${pathDir}/${pathNameDb}`;
-    let db;
+    const dbRef = useRef(null); // Use a ref to hold the database connection
 
-    const config = useCallback(async () => {
-        await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE)
-        // create directory .psb-config
-        await RNFS.mkdir(pathDir);
-
-        // check files
-        const isFileExists = await RNFS.exists(path);
-        const isDbExists = await RNFS.exists(pathDb);
-        if (!isFileExists || !isDbExists) {
-            if (!isFileExists) {
-                await RNFS.writeFile(path, '', 'utf8');
-            }
-            if (!isDbExists) {
-                await RNFS.writeFile(pathDb, '', 'utf8');
-            }
-        }
-    }, []);
-
-    const getAddress = useMemo(async () => {
+    const getAddress = async () => {
         return await RNFS.readFile(path, 'utf8');
-    }, [path]);
+    }
 
     const dbOpen = () => {
-        if (!db) {
-            db = SQLite.openDatabase(
+        if (!dbRef.current) {
+            dbRef.current = SQLite.openDatabase(
                 {
                     name: pathDb,
                     createFromLocation: pathDb
                 },
                 () => {
                     try {
-                        db.executeSql('CREATE TABLE IF NOT EXISTS "parking" ( "id" INTEGER, "plate" TEXT, "created" INTEGER NOT NULL DEFAULT (strftime(\'%s\', \'now\') || substr(strftime(\'%f\', \'now\'), 4)), "created_by" TEXT NOT NULL, "modified" INTEGER, "modified_by" TEXT, PRIMARY KEY("id" AUTOINCREMENT) );');
+                        dbRef.current.executeSql('CREATE TABLE IF NOT EXISTS "parking" ( "id" INTEGER, "plate" TEXT, "created" INTEGER NOT NULL DEFAULT (strftime(\'%s\', \'now\') || substr(strftime(\'%f\', \'now\'), 4)), "created_by" TEXT NOT NULL, "modified" INTEGER, "modified_by" TEXT, PRIMARY KEY("id" AUTOINCREMENT) );');
                         getCountCars();
                         getRecentCars();
                     } catch (e) {
@@ -77,8 +60,8 @@ const Main = () => {
 
     function dbClose() {
         try {
-            if (db) {
-                db.close();
+            if (dbRef.current) {
+                dbRef.current.close();
             }
         } catch (e) {
             toast(getError(e));
@@ -87,28 +70,50 @@ const Main = () => {
 
     useEffect(() => {
         if (Platform.OS === 'android') {
-            DeviceEventEmitter.addListener(BluetoothManager.EVENT_CONNECTED, () => {
-                setConnecting(false);
-                setConnected(true);
-            })
-            DeviceEventEmitter.addListener(BluetoothManager.EVENT_CONNECTION_LOST, () => {
-                // toast('Connection Lost');
-                setConnecting(false);
-                setConnected(false);
-                setTimeout(() => { }, 5000);
-            })
-            DeviceEventEmitter.addListener(BluetoothManager.EVENT_UNABLE_CONNECT, () => {
-                // toast('Unable to Connect Printer');
-                setConnecting(false);
-                setConnected(false);
-                setTimeout(() => { }, 5000);
-            })
+            DeviceEventEmitter.addListener(
+                BluetoothManager.EVENT_CONNECTED,
+                () => {
+                    setConnecting(false);
+                    setConnected(true);
+                }
+            );
+            DeviceEventEmitter.addListener(
+                BluetoothManager.EVENT_CONNECTION_LOST,
+                () => {
+                    // toast('Connection Lost');
+                    setConnecting(false);
+                    setConnected(false);
+                }
+            );
+            DeviceEventEmitter.addListener(
+                BluetoothManager.EVENT_UNABLE_CONNECT,
+                () => {
+                    // toast('Unable to Connect Printer');
+                    setConnecting(false);
+                    setConnected(false);
+                }
+            );
+
+            const config = async () => {
+                await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE)
+                // create directory .psb-config
+                await RNFS.mkdir(pathDir);
+
+                // check files
+                const [isFileExists, isDbExists] = await Promise.all([RNFS.exists(path), RNFS.exists(pathDb)]);
+                if (!isFileExists || !isDbExists) {
+                    await Promise.all([
+                        !isFileExists && RNFS.writeFile(path, '', 'utf8'),
+                        !isDbExists && RNFS.writeFile(pathDb, '', 'utf8')
+                    ]);
+                }
+            }
 
             const init = async () => {
                 try {
                     dbOpen();
                     await config();
-                    if (!connected && address) {
+                    if (!connected) {
                         await connectPrinter();
                     }
                 } catch (e) {
@@ -123,44 +128,44 @@ const Main = () => {
         }
     }, []);
 
-    const connectPrinter = useCallback(async () => {
+    const connectPrinter = async () => {
         try {
             setConnecting(true);
             const address = await getAddress();
-            address && BluetoothManager.connect(address)
-                .then(
-                    () => { setConnected(true); },
-                    (e) => {
-                        toast(getError(e));
-                        setConnected(false);
-                    }
-                )
-                .catch(
-                    (e) => {
-                        toast(getError(e));
-                        setConnected(false);
-                    }
-                )
-                .finally(
-                    () => { setConnecting(false); }
-                );
+            if (address) {
+                BluetoothManager.connect(address)
+                    .then(
+                        () => { setConnected(true); },
+                        (e) => {
+                            toast(getError(e));
+                            setConnected(false);
+                        }
+                    )
+                    .catch(
+                        (e) => {
+                            toast(getError(e));
+                            setConnected(false);
+                        }
+                    );
+            }
+            setConnecting(false);
         } catch (e) {
             toast(getError(e));
         }
-    }, [address]);
+    };
 
-    const sql_today = useMemo(() => {
+    const sql_today = () => {
         const _dateStart = new Date().toDateString() + ' 00:00:00',
             _dateEnd = new Date().toDateString() + ' 23:59:59';
         const start = format(new Date(_dateStart), 'TT', { locale: th }),
             end = format(new Date(_dateEnd), 'TT', { locale: th });
 
         return [start, end];
-    }, [start, end]);
+    }
 
-    const getCountCars = useCallback(() => {
-        if (db) {
-            db.transaction(
+    const getCountCars = () => {
+        if (dbRef.current) {
+            dbRef.current.transaction(
                 (tx) => {
                     const sql = 'select count(id) as "cars" from parking where created >= ? and created <= ?';
                     const args = sql_today();
@@ -169,7 +174,6 @@ const Main = () => {
                         args,
                         (tx, { rows }) => {
                             const arrRows = itemToArray(rows);
-                            console.debug(arrRows);
                             if (arrRows.length < 1) {
                                 setCars(-1);
                             } else {
@@ -188,13 +192,13 @@ const Main = () => {
                 }
             );
         }
-    }, []);
+    }
 
-    const getRecentCars = useCallback(() => {
+    const getRecentCars = () => {
         const sql = 'select * from parking where created >= ? and created <= ? order by id desc limit 5';
         const args = sql_today();
 
-        db.transaction(
+        dbRef.current.transaction(
             (tx) => {
                 tx.executeSql(
                     sql,
@@ -217,11 +221,11 @@ const Main = () => {
                 setCars(-1);
             }
         );
-    }, []);
+    }
 
-    const printslip = useCallback(async (plate) => {
+    const printslip = async (plate) => {
         if (plate) {
-            db.transaction((tx) => {
+            dbRef.current.transaction((tx) => {
                 const sql = 'insert into parking(plate, created_by) values (?,?)';
                 const created_by = 'app';
                 tx.executeSql(
@@ -240,9 +244,9 @@ const Main = () => {
                 );
             });
         }
-    }, [plate]);
+    }
 
-    const print = useCallback(async (plate = '') => {
+    const print = async (plate = '') => {
         const opts = { widthtimes: 0, heigthtimes: 0, fonttype: 0 };
         const opts2 = { widthtimes: 0, heigthtimes: 1, fonttype: 0 };
         await BluetoothEscposPrinter.printerInit();
@@ -260,13 +264,13 @@ const Main = () => {
         await BluetoothEscposPrinter.printPic(slipFooter2, { width: 250, left: 60 });
         // await BluetoothEscposPrinter.printText('-------------------------------\r\n\r\n', opts);
         await BluetoothEscposPrinter.printText('\r\n\r\n\r\n', opts);
-    }, [plate]);
+    }
 
-    const reprintslip = useCallback(async (plate) => {
+    const reprintslip = async (plate) => {
         if (plate) {
             await print(plate);
         }
-    }, [plate]);
+    }
 
     return (
         <MenuProvider>
@@ -316,7 +320,7 @@ const Main = () => {
                         </Row>
                     </Col>
                 </Row>
-                <Row size={1.2}>
+                <Row size={1.5}>
                     <Col>
                         <MainPos printslip={printslip}
                             connected={connected}
@@ -324,7 +328,7 @@ const Main = () => {
                         />
                     </Col>
                 </Row>
-                <Row size={2}>
+                <Row size={1.5}>
                     <MainRecentCars onReprint={reprintslip}
                         plates={listCars}
                         connected={connected}
@@ -335,7 +339,7 @@ const Main = () => {
     );
 }
 
-const defaultStyles = useMemo(() => StyleSheet.create({
+const defaultStyles = StyleSheet.create({
     content: {
         backgroundColor: '#fcffc9',
         flex: 1,
@@ -365,6 +369,6 @@ const defaultStyles = useMemo(() => StyleSheet.create({
     view: {
         flex: 1,
     },
-}), []);
+});
 
 export default Main;

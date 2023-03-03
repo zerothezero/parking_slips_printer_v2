@@ -11,7 +11,7 @@
     "clean-ios": "(cd ios && bundle install && bundle exec pod install)",
     "clean-android": "(cd android && ./gradlew clean)",
     "build-android": "(cd android && ./gradlew assembleDebug)",
-    "android-release": "npx react-native run-android --variant=release",
+    "android-release": "npx react-native run-android --active-arch-only --variant=release",
     "ios-release": "npx react-native run-ios --configuration Release",
     "clear-psb": "adb shell rm -rf /storage/emulated/0/.psb-config",
     "list-psb": "adb shell ls -la /storage/emulated/0 | grep psb"

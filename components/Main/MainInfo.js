@@ -6,7 +6,7 @@ import { Text } from 'native-base';
 
 const MainInfo = (props) => {
     const textStyle = {
-        fontSize: 36,
+        fontSize: 30,
         fontWeight: 'bold',
         flexWrap: 'wrap',
         paddingTop: 20,

@@ -1,7 +1,44 @@
-import {Button, Icon, Text} from 'native-base';
-import React, {useState} from 'react';
-import {StyleSheet, TextInput, View} from 'react-native';
-import {Grid, Row} from 'react-native-easy-grid';
+import { Button, Text } from 'native-base';
+import React, { useState } from 'react';
+import { StyleSheet, TextInput, View } from 'react-native';
+import { Grid, Row } from 'react-native-easy-grid';
+
+const MainPos = (props) => {
+    let [plate, setPlate] = useState('');
+
+    const handlePlate = (plate) => {
+        setPlate(plate);
+    };
+
+    const handlePrint = () => {
+        props.printslip(plate);
+        setPlate('');
+    };
+
+    return (
+        <View style={props.content}>
+            <Grid>
+                <Row size={1.5}>
+                    <TextInput
+                        style={styles.txtPlate}
+                        autoFocus={false}
+                        autoCorrect={false}
+                        keyboardType="number-pad" autoCompleteType="off" textAlignVertical="center"
+                        value={plate} onChangeText={handlePlate} maxLength={4} />
+                </Row>
+                <Row size={1}>
+                    <Button
+                        bg='success.300'
+                        onPress={handlePrint}
+                        style={styles.btnPrint}
+                        isDisabled={!props.connected}>
+                        <Text bold fontSize="xl">PRINT</Text>
+                    </Button>
+                </Row>
+            </Grid>
+        </View>
+    );
+}
 
 const styles = StyleSheet.create({
     txtPlate: {
@@ -23,41 +60,9 @@ const styles = StyleSheet.create({
     btnPrint: {
         flex: 1,
         alignSelf: 'center',
-        height: '65%',
+        height: '75%',
         marginHorizontal: '15%',
     },
 });
-
-const MainPos = (props) => {
-    let [plate, setPlate] = useState('');
-
-    const handlePlate = (plate) => {
-        setPlate(plate);
-    };
-
-    const handlePrint = () => {
-        props.printslip(plate);
-        setPlate('');
-    };
-
-    return (
-        <View style={props.content}>
-            <Grid>
-                <Row size={1}>
-                    <TextInput style={styles.txtPlate} autoFocus={true} autoCorrect={false}
-                               keyboardType="number-pad" autoCompleteType="off" textAlignVertical="center"
-                               value={plate} onChangeText={handlePlate} maxLength={4}/>
-                </Row>
-                <Row size={1}>
-                    <Button rounded success onPress={handlePrint} style={styles.btnPrint}
-                            disabled={!props.connected} iconLeft>
-                        <Icon name="print" style={{fontSize: 36}}/>
-                        <Text style={{fontSize: 36, fontWeight: 'bold', textAlignVertical: 'center'}}>Print</Text>
-                    </Button>
-                </Row>
-            </Grid>
-        </View>
-    );
-}
 
 export default MainPos;
