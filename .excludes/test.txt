@@ -1,0 +1,1 @@
+CREATE TABLE "parking" ( "id" INTEGER, "plate" TEXT, "created" INTEGER NOT NULL DEFAULT (strftime('%s', 'now') || substr(strftime('%f', 'now'), 4)), "created_by" TEXT NOT NULL, "modified" INTEGER, "modified_by" TEXT, PRIMARY KEY("id" AUTOINCREMENT) );
