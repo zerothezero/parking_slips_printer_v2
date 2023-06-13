@@ -1,4 +1,4 @@
-import { add, format } from 'date-fns';
+import { format } from 'date-fns';
 import { th } from 'date-fns/locale';
 import { Button, Text } from 'native-base';
 import React, { useEffect, useState, useRef } from 'react';
@@ -18,11 +18,23 @@ import RNFS from "react-native-fs";
 import Icon from "react-native-vector-icons/SimpleLineIcons"
 
 // v2
+import { GoogleSpreadsheet } from 'google-spreadsheet';
+import moment from "moment";
+import 'moment/locale/th';
+// config locale for moment
+moment.locale('th');
+
 const pathDir = `/storage/emulated/0/.psb-config`;
 const pathName = `parking_slip_printer.txt`;
 const pathNameDb = `parking_slip_printer.db`;
+const pathNameLog = 'parking_slip_printer.log';
 const path = `${pathDir}/${pathName}`;
 const pathDb = `${pathDir}/${pathNameDb}`;
+const pathLog = `${pathDir}/${pathNameLog}`;
+// Google API
+const SPREADSHEET_ID = process.env.REACT_APP_GOOGLE_SHEET_ID;
+const CLIENT_EMAIL = process.env.REACT_APP_GOOGLE_SERVICE_ACCOUNT_EMAIL;
+const PRIVATE_KEY = process.env.REACT_APP_GOOGLE_PRIVATE_KEY;
 
 const Main = () => {
     let [cars, setCars] = useState(0);
@@ -30,6 +42,7 @@ const Main = () => {
     let [connecting, setConnecting] = useState(false);
     let [connected, setConnected] = useState(false); // true if connected to printer - TODO: change back to false for production
     const dbRef = useRef(null); // Use a ref to hold the database connection
+    const doc = useRef(null); // google sheet ref.
 
     const getAddress = async () => {
         return await RNFS.readFile(path, 'utf8');
@@ -95,16 +108,17 @@ const Main = () => {
             );
 
             const config = async () => {
-                await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE)
+                await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE);
                 // create directory .psb-config
                 await RNFS.mkdir(pathDir);
 
                 // check files
-                const [isFileExists, isDbExists] = await Promise.all([RNFS.exists(path), RNFS.exists(pathDb)]);
-                if (!isFileExists || !isDbExists) {
+                const [isFileExists, isDbExists, isLogExists] = await Promise.all([RNFS.exists(path), RNFS.exists(pathDb), RNFS.exists(pathLog)]);
+                if (!isFileExists || !isDbExists || !isLogExists) {
                     await Promise.all([
                         !isFileExists && RNFS.writeFile(path, '', 'utf8'),
-                        !isDbExists && RNFS.writeFile(pathDb, '', 'utf8')
+                        !isDbExists && RNFS.writeFile(pathDb, '', 'utf8'),
+                        !isLogExists && RNFS.writeFile(pathLog, '', 'utf8')
                     ]);
                 }
             }
@@ -115,6 +129,9 @@ const Main = () => {
                     await config();
                     if (!connected) {
                         await connectPrinter();
+                    }
+                    if (!doc.current) {
+                        await loadDoc();
                     }
                 } catch (e) {
                     toast(getError(e));
@@ -157,8 +174,8 @@ const Main = () => {
     const sql_today = () => {
         const _dateStart = new Date().toDateString() + ' 00:00:00',
             _dateEnd = new Date().toDateString() + ' 23:59:59';
-        const start = format(new Date(_dateStart), 'TT', { locale: th }),
-            end = format(new Date(_dateEnd), 'TT', { locale: th });
+        const start = format(new Date(_dateStart), 'TT', {locale: th}),
+            end = format(new Date(_dateEnd), 'TT', {locale: th});
 
         return [start, end];
     }
@@ -172,7 +189,7 @@ const Main = () => {
                     tx.executeSql(
                         sql,
                         args,
-                        (tx, { rows }) => {
+                        (tx, {rows}) => {
                             const arrRows = itemToArray(rows);
                             if (arrRows.length < 1) {
                                 setCars(-1);
@@ -203,7 +220,7 @@ const Main = () => {
                 tx.executeSql(
                     sql,
                     args,
-                    (tx, { rows }) => {
+                    (tx, {rows}) => {
                         const arrRows = itemToArray(rows);
                         if (arrRows.length < 1) {
                             setListCars([]);
@@ -231,9 +248,10 @@ const Main = () => {
                 tx.executeSql(
                     sql,
                     [plate, created_by],
-                    (tx, { rowsAffected }) => {
+                    (tx, {rowsAffected}) => {
                         if (rowsAffected > 0) {
                             print(plate);
+                            saveDataToGoogleSheet(plate);
                         }
                         getCountCars();
                         getRecentCars();
@@ -247,11 +265,11 @@ const Main = () => {
     }
 
     const print = async (plate = '') => {
-        const opts = { widthtimes: 0, heigthtimes: 0, fonttype: 0 };
-        const opts2 = { widthtimes: 0, heigthtimes: 1, fonttype: 0 };
+        const opts = {widthtimes: 0, heigthtimes: 0, fonttype: 0};
+        const opts2 = {widthtimes: 0, heigthtimes: 1, fonttype: 0};
         await BluetoothEscposPrinter.printerInit();
         await BluetoothEscposPrinter.setBlob(0);
-        await BluetoothEscposPrinter.printPic(slipHeader, { width: 180, left: 90 });
+        await BluetoothEscposPrinter.printPic(slipHeader, {width: 180, left: 90});
         await BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.CENTER);
         await BluetoothEscposPrinter.printText('07.00 - 15.00\r\n', opts);
         await BluetoothEscposPrinter.printText('--------------------------------\r\n', opts);
@@ -260,8 +278,8 @@ const Main = () => {
         await BluetoothEscposPrinter.printColumn([16, 16], [BluetoothEscposPrinter.ALIGN.LEFT, BluetoothEscposPrinter.ALIGN.RIGHT], ['Plate :', plate], opts2);
         await BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.CENTER);
         await BluetoothEscposPrinter.printText('--------------------------------\r\n', opts);
-        await BluetoothEscposPrinter.printPic(slipFooter1, { width: 250, left: 60 });
-        await BluetoothEscposPrinter.printPic(slipFooter2, { width: 250, left: 60 });
+        await BluetoothEscposPrinter.printPic(slipFooter1, {width: 250, left: 60});
+        await BluetoothEscposPrinter.printPic(slipFooter2, {width: 250, left: 60});
         // await BluetoothEscposPrinter.printText('-------------------------------\r\n\r\n', opts);
         await BluetoothEscposPrinter.printText('\r\n\r\n\r\n', opts);
     }
@@ -271,6 +289,80 @@ const Main = () => {
             await print(plate);
         }
     }
+
+    const loadDoc = async () => {
+        // Authenticate with the Google Sheets API using a service account
+        doc.current = new GoogleSpreadsheet(SPREADSHEET_ID);
+        await doc.current.useServiceAccountAuth({
+            client_email: CLIENT_EMAIL,
+            private_key: PRIVATE_KEY.replace(/\\n/g, '\n'), // Replace escaped newlines with actual newlines
+        });
+        await doc.current.loadInfo();
+    }
+
+    const saveDataToGoogleSheet = async (data) => {
+        // Get the current date and sheet name
+        const created = moment().format('dddd, DD/MM/YYYY HH:mm:ss');
+        const time = moment().format('HH:mm:ss');
+        const year = moment().format('YYYY');
+        const month = moment().format('MM');
+        const day = moment().format('DD');
+        const dow = moment().format('dddd');
+
+        try {
+            if (!doc.current) {
+                await loadDoc();
+            }
+            const sheetName = `${year}_${month}_${day}`;
+            // Find or create the sheet for the current date
+            let sheet = await doc.current.sheetsByTitle[sheetName];
+            if (!sheet) {
+                sheet = await doc.current.addSheet({
+                    title: sheetName,
+                    headerValues: ['plate', 'created', 'dow', 'day', 'month', 'year', 'time'],
+                    gridProperties: {
+                        frozenRowCount: 1
+                    },
+                    index: 1,
+                });
+            }
+            await sheet.loadCells();
+            // new method
+            let rows = await sheet.getRows({
+                limit: 2,
+            });
+            if (rows.length === 0) {
+                await sheet.addRow([data, created, dow, day, month, year, time], {raw: true});
+            } else {
+                // insert new empty row at row2
+                await sheet.insertDimension(
+                    'ROWS',
+                    {
+                        startIndex: 1,
+                        endIndex: 2,
+                    },
+                    false,
+                );
+                rows[0].plate = data;
+                rows[0].created = created;
+                rows[0].dow = dow;
+                rows[0].day = day;
+                rows[0].month = month;
+                rows[0].year = year;
+                rows[0].time = time;
+
+                await rows[0].save({raw: true});
+            }
+            for (let c = 0; c < 7; c++) {
+                const cell = sheet.getCell(1, c);
+                cell.textFormat = {fontSize: 12}
+            }
+            await sheet.saveUpdatedCells();
+        } catch (e) {
+            let msg = `${moment().format('YYYY/MM/DD HH:mm:ss:SSSSSS')} \t ERR \t${data}|${created}\n`;
+            await RNFS.appendFile(pathLog, msg, 'utf8');
+        }
+    };
 
     return (
         <MenuProvider>
@@ -285,21 +377,21 @@ const Main = () => {
                         <Row size={1}>
                             <View style={StyleSheet.flatten([defaultStyles.content, defaultStyles.content_right])}>
                                 <Button full
-                                    isDisabled={connecting || connected}
-                                    _disabled={{ opacity: 0.6 }}
-                                    onPress={connectPrinter}
-                                    iconLeft
-                                    style={{
-                                        flex: 1,
-                                        flexDirection: 'column',
-                                        width: '100%'
-                                    }}
-                                    colorScheme={connected ? 'success' : 'warning'}
-                                    leftIcon={
-                                        <Icon name="printer"
-                                            style={{ fontSize: 20, fontWeight: 'bold', color: 'white' }}
-                                        />
-                                    }
+                                        isDisabled={connecting || connected}
+                                        _disabled={{opacity: 0.6}}
+                                        onPress={connectPrinter}
+                                        iconLeft
+                                        style={{
+                                            flex: 1,
+                                            flexDirection: 'column',
+                                            width: '100%'
+                                        }}
+                                        colorScheme={connected ? 'success' : 'warning'}
+                                        leftIcon={
+                                            <Icon name="printer"
+                                                  style={{fontSize: 20, fontWeight: 'bold', color: 'white'}}
+                                            />
+                                        }
                                 >
                                     <Text style={{
                                         color: 'white',
@@ -315,24 +407,24 @@ const Main = () => {
                         </Row>
                         <Row size={1}>
                             <MainCP cars={cars}
-                                getCars={getCountCars}
-                                content={StyleSheet.flatten([defaultStyles.content, defaultStyles.content_right])} />
+                                    getCars={getCountCars}
+                                    content={StyleSheet.flatten([defaultStyles.content, defaultStyles.content_right])}/>
                         </Row>
                     </Col>
                 </Row>
                 <Row size={1.5}>
                     <Col>
                         <MainPos printslip={printslip}
-                            connected={connected}
-                            content={StyleSheet.flatten([defaultStyles.content, defaultStyles.content_center])}
+                                 connected={connected}
+                                 content={StyleSheet.flatten([defaultStyles.content, defaultStyles.content_center])}
                         />
                     </Col>
                 </Row>
                 <Row size={1.5}>
                     <MainRecentCars onReprint={reprintslip}
-                        plates={listCars}
-                        connected={connected}
-                        style={StyleSheet.flatten([defaultStyles.content, defaultStyles.content_bottom])} />
+                                    plates={listCars}
+                                    connected={connected}
+                                    style={StyleSheet.flatten([defaultStyles.content, defaultStyles.content_bottom])}/>
                 </Row>
             </Grid>
         </MenuProvider>
