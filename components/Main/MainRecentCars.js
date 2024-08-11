@@ -5,20 +5,20 @@ import { Menu, MenuTrigger, MenuOptions, renderers } from 'react-native-popup-me
 import { dt_format } from '../helper';
 import { Box, FlatList, HStack, Spacer } from 'native-base';
 
-const TooltipReprint = (props) => {
-    const { text, plate, onReprint, connected } = props;
-    return (
-        <Menu renderer={renderers.Popover}
-            rendererProps={{ placement: 'right', preferredPlacement: 'right', anchorStyle: { left: '40%' } }}>
-            <MenuTrigger disabled={!connected} text={text} />
-            <MenuOptions optionsContainerStyle={{ width: '40%', left: '40%' }}>
-                <Button type='clear' title={'พิมพ์ซ้ำ'} onPress={() => {
-                    onReprint(plate);
-                }} />
-            </MenuOptions>
-        </Menu>
-    );
-};
+// const TooltipReprint = (props) => {
+//     const { text, plate, onReprint, connected } = props;
+//     return (
+//         <Menu renderer={renderers.Popover}
+//             rendererProps={{ placement: 'right', preferredPlacement: 'right', anchorStyle: { left: '40%' } }}>
+//             <MenuTrigger disabled={!connected} text={text} />
+//             <MenuOptions optionsContainerStyle={{ width: '40%', left: '40%' }}>
+//                 <Button type='clear' title={'พิมพ์ซ้ำ'} onPress={() => {
+//                     onReprint(plate);
+//                 }} />
+//             </MenuOptions>
+//         </Menu>
+//     );
+// };
 
 const MainRecentCars = (props) => {
     let [showReprint, setShowReprint] = useState(false);
@@ -57,10 +57,9 @@ const MainRecentCars = (props) => {
                                         text={dt_format(item.created, 'HH:mm:ss')}
                                         style={{ fontSize: 20 }}
                                     /> */}
+                                    <Text style={{ fontSize: 14 }}>{dt_format(item.created, 'HH:mm:ss')}</Text>
                                     <Spacer />
-                                    <Text
-                                        style={{ fontWeight: 900 }}
-                                    >{item.plate}</Text>
+                                    <Text style={{ fontWeight: 900, fontSize: 14 }}>{item.plate}</Text>
                                 </HStack>
                             </Box>
                         )

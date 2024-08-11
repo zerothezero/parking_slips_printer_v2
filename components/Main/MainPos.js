@@ -1,5 +1,5 @@
 import { Button, Text } from 'native-base';
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 import { Grid, Row } from 'react-native-easy-grid';
 
@@ -20,6 +20,7 @@ const MainPos = (props) => {
             <Grid>
                 <Row size={1.5}>
                     <TextInput
+                        ref={props.posInputRef}
                         style={styles.txtPlate}
                         autoFocus={false}
                         autoCorrect={false}
@@ -50,7 +51,7 @@ const styles = StyleSheet.create({
         marginHorizontal: '15%',
         marginTop: '4%',
         includeFontPadding: false,
-        fontSize: 60,
+        fontSize: 80,
         letterSpacing: 10,
         fontWeight: 'bold',
         textAlign: 'center',

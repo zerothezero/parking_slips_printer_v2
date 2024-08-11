@@ -43,6 +43,7 @@ const Main = () => {
     let [connected, setConnected] = useState(false); // true if connected to printer - TODO: change back to false for production
     const dbRef = useRef(null); // Use a ref to hold the database connection
     const doc = useRef(null); // google sheet ref.
+    const mainPosRef = useRef(null);
 
     const getAddress = async () => {
         return await RNFS.readFile(path, 'utf8');
@@ -138,6 +139,11 @@ const Main = () => {
                 }
             }
             init().then(() => { toast('--- Ready ---') });
+            if (mainPosRef.current) {
+                setTimeout(() => {
+                    mainPosRef.current.focus();
+                }, 100); // หน่วงเวลาเล็กน้อย
+            }
         }
 
         return () => {
@@ -416,6 +422,7 @@ const Main = () => {
                     <Col>
                         <MainPos printslip={printslip}
                                  connected={connected}
+                                 posInputRef={mainPosRef}
                                  content={StyleSheet.flatten([defaultStyles.content, defaultStyles.content_center])}
                         />
                     </Col>
