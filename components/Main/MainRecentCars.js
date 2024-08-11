@@ -49,14 +49,14 @@ const MainRecentCars = (props) => {
                                 mx='10%'
                             >
                                 <HStack justifyContent='space-between'>
-                                    <TooltipReprint
+                                    {/* <TooltipReprint
                                         plate={item.plate}
                                         onReprint={props.onReprint}
                                         onSelect={hide}
                                         connected={props.connected}
                                         text={dt_format(item.created, 'HH:mm:ss')}
                                         style={{ fontSize: 20 }}
-                                    />
+                                    /> */}
                                     <Spacer />
                                     <Text
                                         style={{ fontWeight: 900 }}

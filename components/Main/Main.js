@@ -18,7 +18,7 @@ import RNFS from "react-native-fs";
 import Icon from "react-native-vector-icons/SimpleLineIcons"
 
 // v2
-import { GoogleSpreadsheet } from 'google-spreadsheet';
+// import { GoogleSpreadsheet } from 'google-spreadsheet';
 import moment from "moment";
 import 'moment/locale/th';
 // config locale for moment
@@ -32,9 +32,9 @@ const path = `${pathDir}/${pathName}`;
 const pathDb = `${pathDir}/${pathNameDb}`;
 const pathLog = `${pathDir}/${pathNameLog}`;
 // Google API
-const SPREADSHEET_ID = process.env.REACT_APP_GOOGLE_SHEET_ID;
-const CLIENT_EMAIL = process.env.REACT_APP_GOOGLE_SERVICE_ACCOUNT_EMAIL;
-const PRIVATE_KEY = process.env.REACT_APP_GOOGLE_PRIVATE_KEY;
+// const SPREADSHEET_ID = process.env.REACT_APP_GOOGLE_SHEET_ID;
+// const CLIENT_EMAIL = process.env.REACT_APP_GOOGLE_SERVICE_ACCOUNT_EMAIL;
+// const PRIVATE_KEY = process.env.REACT_APP_GOOGLE_PRIVATE_KEY;
 
 const Main = () => {
     let [cars, setCars] = useState(0);
@@ -130,9 +130,9 @@ const Main = () => {
                     if (!connected) {
                         await connectPrinter();
                     }
-                    if (!doc.current) {
-                        await loadDoc();
-                    }
+                    // if (!doc.current) {
+                    //     await loadDoc();
+                    // }
                 } catch (e) {
                     toast(getError(e));
                 }
@@ -251,7 +251,7 @@ const Main = () => {
                     (tx, {rowsAffected}) => {
                         if (rowsAffected > 0) {
                             print(plate);
-                            saveDataToGoogleSheet(plate);
+                            // saveDataToGoogleSheet(plate);
                         }
                         getCountCars();
                         getRecentCars();
@@ -271,7 +271,7 @@ const Main = () => {
         await BluetoothEscposPrinter.setBlob(0);
         await BluetoothEscposPrinter.printPic(slipHeader, {width: 180, left: 90});
         await BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.CENTER);
-        await BluetoothEscposPrinter.printText('07.00 - 15.00\r\n', opts);
+        await BluetoothEscposPrinter.printText('06.30 - 19.00\r\n', opts);
         await BluetoothEscposPrinter.printText('--------------------------------\r\n', opts);
         await BluetoothEscposPrinter.printText(dt_now() + '\r\n', opts);
         await BluetoothEscposPrinter.printText('--------------------------------\r\n', opts);
@@ -290,79 +290,79 @@ const Main = () => {
         }
     }
 
-    const loadDoc = async () => {
-        // Authenticate with the Google Sheets API using a service account
-        doc.current = new GoogleSpreadsheet(SPREADSHEET_ID);
-        await doc.current.useServiceAccountAuth({
-            client_email: CLIENT_EMAIL,
-            private_key: PRIVATE_KEY.replace(/\\n/g, '\n'), // Replace escaped newlines with actual newlines
-        });
-        await doc.current.loadInfo();
-    }
+    // const loadDoc = async () => {
+    //     // Authenticate with the Google Sheets API using a service account
+    //     doc.current = new GoogleSpreadsheet(SPREADSHEET_ID);
+    //     await doc.current.useServiceAccountAuth({
+    //         client_email: CLIENT_EMAIL,
+    //         private_key: PRIVATE_KEY.replace(/\\n/g, '\n'), // Replace escaped newlines with actual newlines
+    //     });
+    //     await doc.current.loadInfo();
+    // }
 
-    const saveDataToGoogleSheet = async (data) => {
-        // Get the current date and sheet name
-        const created = moment().format('dddd, DD/MM/YYYY HH:mm:ss');
-        const time = moment().format('HH:mm:ss');
-        const year = moment().format('YYYY');
-        const month = moment().format('MM');
-        const day = moment().format('DD');
-        const dow = moment().format('dddd');
+    // const saveDataToGoogleSheet = async (data) => {
+    //     // Get the current date and sheet name
+    //     const created = moment().format('dddd, DD/MM/YYYY HH:mm:ss');
+    //     const time = moment().format('HH:mm:ss');
+    //     const year = moment().format('YYYY');
+    //     const month = moment().format('MM');
+    //     const day = moment().format('DD');
+    //     const dow = moment().format('dddd');
 
-        try {
-            if (!doc.current) {
-                await loadDoc();
-            }
-            const sheetName = `${year}_${month}_${day}`;
-            // Find or create the sheet for the current date
-            let sheet = await doc.current.sheetsByTitle[sheetName];
-            if (!sheet) {
-                sheet = await doc.current.addSheet({
-                    title: sheetName,
-                    headerValues: ['plate', 'created', 'dow', 'day', 'month', 'year', 'time'],
-                    gridProperties: {
-                        frozenRowCount: 1
-                    },
-                    index: 1,
-                });
-            }
-            await sheet.loadCells();
-            // new method
-            let rows = await sheet.getRows({
-                limit: 2,
-            });
-            if (rows.length === 0) {
-                await sheet.addRow([data, created, dow, day, month, year, time], {raw: true});
-            } else {
-                // insert new empty row at row2
-                await sheet.insertDimension(
-                    'ROWS',
-                    {
-                        startIndex: 1,
-                        endIndex: 2,
-                    },
-                    false,
-                );
-                rows[0].plate = data;
-                rows[0].created = created;
-                rows[0].dow = dow;
-                rows[0].day = day;
-                rows[0].month = month;
-                rows[0].year = year;
-                rows[0].time = time;
+    //     try {
+    //         if (!doc.current) {
+    //             await loadDoc();
+    //         }
+    //         const sheetName = `${year}_${month}_${day}`;
+    //         // Find or create the sheet for the current date
+    //         let sheet = await doc.current.sheetsByTitle[sheetName];
+    //         if (!sheet) {
+    //             sheet = await doc.current.addSheet({
+    //                 title: sheetName,
+    //                 headerValues: ['plate', 'created', 'dow', 'day', 'month', 'year', 'time'],
+    //                 gridProperties: {
+    //                     frozenRowCount: 1
+    //                 },
+    //                 index: 1,
+    //             });
+    //         }
+    //         await sheet.loadCells();
+    //         // new method
+    //         let rows = await sheet.getRows({
+    //             limit: 2,
+    //         });
+    //         if (rows.length === 0) {
+    //             await sheet.addRow([data, created, dow, day, month, year, time], {raw: true});
+    //         } else {
+    //             // insert new empty row at row2
+    //             await sheet.insertDimension(
+    //                 'ROWS',
+    //                 {
+    //                     startIndex: 1,
+    //                     endIndex: 2,
+    //                 },
+    //                 false,
+    //             );
+    //             rows[0].plate = data;
+    //             rows[0].created = created;
+    //             rows[0].dow = dow;
+    //             rows[0].day = day;
+    //             rows[0].month = month;
+    //             rows[0].year = year;
+    //             rows[0].time = time;
 
-                await rows[0].save({raw: true});
-            }
-            for (let c = 0; c < 7; c++) {
-                const cell = sheet.getCell(1, c);
-                cell.textFormat = {fontSize: 12}
-            }
-            await sheet.saveUpdatedCells();
-        } catch (e) {
-            let msg = `${moment().format('YYYY/MM/DD HH:mm:ss:SSSSSS')} \t ERR \t${data}|${created}\n`;
-            await RNFS.appendFile(pathLog, msg, 'utf8');
-        }
-    };
+    //             await rows[0].save({raw: true});
+    //         }
+    //         for (let c = 0; c < 7; c++) {
+    //             const cell = sheet.getCell(1, c);
+    //             cell.textFormat = {fontSize: 12}
+    //         }
+    //         await sheet.saveUpdatedCells();
+    //     } catch (e) {
+    //         let msg = `${moment().format('YYYY/MM/DD HH:mm:ss:SSSSSS')} \t ERR \t${data}|${created}\n`;
+    //         await RNFS.appendFile(pathLog, msg, 'utf8');
+    //     }
+    // };
 
     return (
         <MenuProvider>
