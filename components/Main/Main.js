@@ -279,7 +279,7 @@ const Main = () => {
         await BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.CENTER);
         await BluetoothEscposPrinter.printText('06.30 - 19.00\r\n', opts);
         await BluetoothEscposPrinter.printText('--------------------------------\r\n', opts);
-        await BluetoothEscposPrinter.printText(dt_now() + '\r\n', opts);
+        await BluetoothEscposPrinter.printText(dt_now() + '\r\n', {widthtimes: 1, heigthtimes: 1});
         await BluetoothEscposPrinter.printText('--------------------------------\r\n', opts);
         await BluetoothEscposPrinter.printColumn([16, 16], [BluetoothEscposPrinter.ALIGN.LEFT, BluetoothEscposPrinter.ALIGN.RIGHT], ['Plate :', plate], opts2);
         await BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.CENTER);
