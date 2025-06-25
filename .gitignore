@@ -1,4 +1,4 @@
-android/
+!android/
 ios/
 package-lock.json
 *.lock
