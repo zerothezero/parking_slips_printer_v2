@@ -18,11 +18,13 @@ import RNFS from "react-native-fs";
 import Icon from "react-native-vector-icons/SimpleLineIcons"
 
 // v2
-// import { GoogleSpreadsheet } from 'google-spreadsheet';
-import moment from "moment";
-import 'moment/locale/th';
+// import moment from "moment";
+// import 'moment/locale/th';
 // config locale for moment
-moment.locale('th');
+// moment.locale('th');
+
+// import BluetoothService.js (from Cluade AI)
+import BluetoothService from '../BluetoothService';
 
 const pathDir = `/storage/emulated/0/.psb-config`;
 const pathName = `parking_slip_printer.txt`;
@@ -31,10 +33,6 @@ const pathNameLog = 'parking_slip_printer.log';
 const path = `${pathDir}/${pathName}`;
 const pathDb = `${pathDir}/${pathNameDb}`;
 const pathLog = `${pathDir}/${pathNameLog}`;
-// Google API
-// const SPREADSHEET_ID = process.env.REACT_APP_GOOGLE_SHEET_ID;
-// const CLIENT_EMAIL = process.env.REACT_APP_GOOGLE_SERVICE_ACCOUNT_EMAIL;
-// const PRIVATE_KEY = process.env.REACT_APP_GOOGLE_PRIVATE_KEY;
 
 const Main = () => {
     let [cars, setCars] = useState(0);
@@ -42,7 +40,6 @@ const Main = () => {
     let [connecting, setConnecting] = useState(false);
     let [connected, setConnected] = useState(false); // true if connected to printer - TODO: change back to false for production
     const dbRef = useRef(null); // Use a ref to hold the database connection
-    const doc = useRef(null); // google sheet ref.
     const mainPosRef = useRef(null);
 
     const getAddress = async () => {
@@ -131,9 +128,6 @@ const Main = () => {
                     if (!connected) {
                         await connectPrinter();
                     }
-                    // if (!doc.current) {
-                    //     await loadDoc();
-                    // }
                 } catch (e) {
                     toast(getError(e));
                 }
@@ -147,33 +141,35 @@ const Main = () => {
         }
 
         return () => {
+            // Cleanup เมื่อ component unmount
             dbClose();
+            
+            // Disconnect bluetooth เมื่อปิดแอพ
+            if (connected) {
+                BluetoothManager.disconnect().catch(() => {
+                    // ไม่ต้องแสดง error
+                });
+            }
         }
     }, []);
 
     const connectPrinter = async () => {
         try {
             setConnecting(true);
-            const address = await getAddress();
-            if (address) {
-                BluetoothManager.connect(address)
-                    .then(
-                        () => { setConnected(true); },
-                        (e) => {
-                            toast(getError(e));
-                            setConnected(false);
-                        }
-                    )
-                    .catch(
-                        (e) => {
-                            toast(getError(e));
-                            setConnected(false);
-                        }
-                    );
+            
+            // Auto-connect กับเครื่องที่ paired และเปิดอยู่
+            const result = await BluetoothService.autoConnectPrinter();
+            
+            if (result.success) {
+                setConnected(true);
             }
+            
+            toast(result.message);
+        } catch (error) {
+            toast('เกิดข้อผิดพลาด กรุณาลองใหม่');
+            setConnected(false);
+        } finally {
             setConnecting(false);
-        } catch (e) {
-            toast(getError(e));
         }
     };
 
@@ -295,80 +291,6 @@ const Main = () => {
             await print(plate);
         }
     }
-
-    // const loadDoc = async () => {
-    //     // Authenticate with the Google Sheets API using a service account
-    //     doc.current = new GoogleSpreadsheet(SPREADSHEET_ID);
-    //     await doc.current.useServiceAccountAuth({
-    //         client_email: CLIENT_EMAIL,
-    //         private_key: PRIVATE_KEY.replace(/\\n/g, '\n'), // Replace escaped newlines with actual newlines
-    //     });
-    //     await doc.current.loadInfo();
-    // }
-
-    // const saveDataToGoogleSheet = async (data) => {
-    //     // Get the current date and sheet name
-    //     const created = moment().format('dddd, DD/MM/YYYY HH:mm:ss');
-    //     const time = moment().format('HH:mm:ss');
-    //     const year = moment().format('YYYY');
-    //     const month = moment().format('MM');
-    //     const day = moment().format('DD');
-    //     const dow = moment().format('dddd');
-
-    //     try {
-    //         if (!doc.current) {
-    //             await loadDoc();
-    //         }
-    //         const sheetName = `${year}_${month}_${day}`;
-    //         // Find or create the sheet for the current date
-    //         let sheet = await doc.current.sheetsByTitle[sheetName];
-    //         if (!sheet) {
-    //             sheet = await doc.current.addSheet({
-    //                 title: sheetName,
-    //                 headerValues: ['plate', 'created', 'dow', 'day', 'month', 'year', 'time'],
-    //                 gridProperties: {
-    //                     frozenRowCount: 1
-    //                 },
-    //                 index: 1,
-    //             });
-    //         }
-    //         await sheet.loadCells();
-    //         // new method
-    //         let rows = await sheet.getRows({
-    //             limit: 2,
-    //         });
-    //         if (rows.length === 0) {
-    //             await sheet.addRow([data, created, dow, day, month, year, time], {raw: true});
-    //         } else {
-    //             // insert new empty row at row2
-    //             await sheet.insertDimension(
-    //                 'ROWS',
-    //                 {
-    //                     startIndex: 1,
-    //                     endIndex: 2,
-    //                 },
-    //                 false,
-    //             );
-    //             rows[0].plate = data;
-    //             rows[0].created = created;
-    //             rows[0].dow = dow;
-    //             rows[0].day = day;
-    //             rows[0].month = month;
-    //             rows[0].year = year;
-    //             rows[0].time = time;
-
-    //             await rows[0].save({raw: true});
-    //         }
-    //         for (let c = 0; c < 7; c++) {
-    //             const cell = sheet.getCell(1, c);
-    //             cell.textFormat = {fontSize: 12}
-    //         }
-    //         await sheet.saveUpdatedCells();
-    //     } catch (e) {
-    //         let msg = `${moment().format('YYYY/MM/DD HH:mm:ss:SSSSSS')} \t ERR \t${data}|${created}\n`;
-    //         await RNFS.appendFile(pathLog, msg, 'utf8');
-    //     }
-    // };
 
     return (
         <MenuProvider>
