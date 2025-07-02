@@ -151,7 +151,7 @@ const Main = () => {
                 });
             }
         }
-    }, []);
+    }, [connected]); // เพิ่ม connected เป็น dependency
 
     const connectPrinter = async () => {
         try {
