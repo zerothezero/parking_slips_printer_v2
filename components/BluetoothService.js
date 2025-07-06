@@ -2,6 +2,9 @@
 import { BluetoothManager } from '@brooons/react-native-bluetooth-escpos-printer';
 
 class BluetoothService {
+  constructor() {
+    this.currentDeviceAddress = null; // เก็บข้อมูลเครื่องที่เชื่อมต่ออยู่
+  }
   async autoConnectPrinter() {
     // สแกนหาอุปกรณ์ที่ paired แล้ว
     const pairedDevices = await this.getPairedDevices();
@@ -17,6 +20,10 @@ class BluetoothService {
     for (const device of pairedDevices) {
       try {
         await BluetoothManager.connect(device.address);
+
+        // เก็บข้อมูลเครื่องที่เชื่อมต่อสำเร็จ
+        this.currentDeviceAddress = device;
+
         return { 
           success: true, 
           device,
@@ -34,19 +41,34 @@ class BluetoothService {
     };
   }
 
-  async getPairedDevices() {
-    // เปิด Bluetooth ถ้ายังปิดอยู่
-    const isEnabled = await BluetoothManager.isBluetoothEnabled();
-    if (!isEnabled) {
-      await BluetoothManager.enableBluetooth();
+  async disconnect() {
+    try {
+      if (this.currentDeviceAddress) {
+        await BluetoothManager.disconnect(device.address);
+        this.currentDeviceAddress = null;
+        return true;
+      }
+    } catch (error) {
+      // ไม่ต้องแสดง error
     }
-    
+    return false;
+  }
+
+  async getPairedDevices() {
     // ดึงรายการอุปกรณ์ที่ paired แล้ว
     const devices = await BluetoothManager.scanDevices();
-    const deviceList = JSON.parse(devices);
+    const {found,paired} = JSON.parse(devices);
     
     // กรองเฉพาะที่ paired แล้ว
-    return deviceList.filter(device => device.paired === true);
+    return paired;
+  }
+
+  getCurrentDevice() {
+    return this.currentDeviceAddress;
+  }
+
+  setCurrentDevice(address) {
+    this.currentDeviceAddress = address;
   }
 }
 
