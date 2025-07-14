@@ -2,6 +2,7 @@
 #ios/
 package-lock.json
 *.lock
+android/gradlew
 
 # OSX
 #
