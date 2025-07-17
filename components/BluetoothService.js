@@ -53,7 +53,7 @@ class BluetoothService {
   async disconnect() {
     try {
       if (this.currentDeviceAddress) {
-        await BluetoothManager.disconnect(device.address);
+        await BluetoothManager.disconnect(this.currentDeviceAddress.address);
         this.currentDeviceAddress = null;
         return true;
       }
