@@ -5,6 +5,7 @@ class BluetoothService {
   constructor() {
     this.currentDeviceAddress = null; // เก็บข้อมูลเครื่องที่เชื่อมต่ออยู่
   }
+
   async autoConnectPrinter() {
     // เปิด Bluetooth ก่อน
     const isEnabled = await BluetoothManager.checkBluetoothEnabled();
@@ -22,26 +23,25 @@ class BluetoothService {
       };
     }
     
-    // ลอง connect เฉพาะ paired devices แบบ parallel
-    const connectPromises = pairedDevices.map(device => 
-      BluetoothManager.connect(device.address)
-        .then(() => ({ success: true, device }))
-        .catch(() => ({ success: false, device }))
-    );
-    
-    // รอแค่ตัวแรกที่ connect สำเร็จ
-    const results = await Promise.all(connectPromises);
-    const connected = results.find(r => r.success);
-    
-    if (connected) {
-      // เก็บข้อมูลเครื่องที่เชื่อมต่อสำเร็จ
-      this.currentDeviceAddress = connected.device;
-
-      return { 
-        success: true, 
-        device: connected.device,
-        message: `เชื่อมต่อกับ ${connected.device.name || 'เครื่องพิมพ์'} สำเร็จ`
-      };
+    // ลอง connect ทีละตัว
+    for (const device of pairedDevices) {
+      try {
+        console.log(`Trying to connect to ${device.name || device.address}...`);
+        await BluetoothManager.connect(device.address);
+        
+        // เก็บข้อมูลเครื่องที่เชื่อมต่อสำเร็จ
+        this.currentDeviceAddress = device;
+        console.log(`Connected to ${device.name || device.address}`);
+        
+        return { 
+          success: true, 
+          device: device,
+          message: `เชื่อมต่อกับ ${device.name || 'เครื่องพิมพ์'} สำเร็จ`
+        };
+      } catch (error) {
+        console.log(`Failed to connect to ${device.name || device.address}: ${error.message}`);
+        // Continue to next device
+      }
     }
     
     return { 
@@ -79,6 +79,7 @@ class BluetoothService {
   setCurrentDevice(address) {
     this.currentDeviceAddress = address;
   }
+
 }
 
 export default new BluetoothService();
