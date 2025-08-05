@@ -42,7 +42,7 @@ export function dt_format(timestamp, dateformat = 'dd/MM/yyyy HH:mm:ss') {
     return format(timestamp, dateformat, {locale: th});
 }
 
-export function toast(text, time = ToastAndroid.LONG) {
+export function toast(text, time = ToastAndroid.SHORT) {
     ToastAndroid.show(text, time);
 }
 

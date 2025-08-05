@@ -150,6 +150,24 @@ const Main = () => {
         try {
             setConnecting(true);
             
+            // const address = await getAddress();
+            // if (address) {
+            //     BluetoothManager.connect(address)
+            //         .then(
+            //             () => { setConnected(true); },
+            //             (e) => {
+            //                 toast(getError(e));
+            //                 setConnected(false);
+            //             }
+            //         )
+            //         .catch(
+            //             (e) => {
+            //                 toast(getError(e));
+            //                 setConnected(false);
+            //             }
+            //         );
+            // }
+            
             // Auto-connect กับเครื่องที่ paired และเปิดอยู่
             const result = await BluetoothService.autoConnectPrinter();
             
