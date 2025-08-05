@@ -18,13 +18,10 @@ import RNFS from "react-native-fs";
 import Icon from "react-native-vector-icons/SimpleLineIcons"
 
 // v2
-// import moment from "moment";
-// import 'moment/locale/th';
+import moment from "moment";
+import 'moment/locale/th';
 // config locale for moment
-// moment.locale('th');
-
-// import BluetoothService.js (from Cluade AI)
-import BluetoothService from '../BluetoothService';
+moment.locale('th');
 
 const pathDir = `/storage/emulated/0/.psb-config`;
 const pathName = `parking_slip_printer.txt`;
@@ -149,38 +146,26 @@ const Main = () => {
     const connectPrinter = async () => {
         try {
             setConnecting(true);
-            
-            // const address = await getAddress();
-            // if (address) {
-            //     BluetoothManager.connect(address)
-            //         .then(
-            //             () => { setConnected(true); },
-            //             (e) => {
-            //                 toast(getError(e));
-            //                 setConnected(false);
-            //             }
-            //         )
-            //         .catch(
-            //             (e) => {
-            //                 toast(getError(e));
-            //                 setConnected(false);
-            //             }
-            //         );
-            // }
-            
-            // Auto-connect กับเครื่องที่ paired และเปิดอยู่
-            const result = await BluetoothService.autoConnectPrinter();
-            
-            if (result.success) {
-                setConnected(true);
+            const address = await getAddress();
+            if (address) {
+                BluetoothManager.connect(address)
+                    .then(
+                        () => { setConnected(true); },
+                        (e) => {
+                            toast(getError(e));
+                            setConnected(false);
+                        }
+                    )
+                    .catch(
+                        (e) => {
+                            toast(getError(e));
+                            setConnected(false);
+                        }
+                    );
             }
-            
-            toast(result.message);
-        } catch (error) {
-            toast('เกิดข้อผิดพลาด กรุณาลองใหม่');
-            setConnected(false);
-        } finally {
             setConnecting(false);
+        } catch (e) {
+            toast(getError(e));
         }
     };
 
