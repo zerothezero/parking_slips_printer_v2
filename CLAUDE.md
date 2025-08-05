@@ -149,3 +149,153 @@ await BluetoothEscposPrinter.printText('text\r\n', opts);
 - **DEVELOPMENT_LOG.md** - Track changes across platforms
 - **QUICK_START.md** - Immediate commands and patterns
 - **TROUBLESHOOTING.md** - Common issues and solutions
+
+---
+
+## Code Refactoring & Optimization Plan
+
+### Overview
+Comprehensive plan for improving code quality, performance, maintainability, and modern React practices.
+
+### Major Issues Identified
+
+#### 1. **Architecture & Structure Issues**
+- Monolithic Main.js component (400+ lines) handling too many responsibilities
+- Mixed date libraries (both date-fns and moment.js)
+- No proper state management pattern
+- Missing TypeScript support
+- Inconsistent error handling
+
+#### 2. **Performance Issues**
+- Database queries triggered on every render
+- Missing React.memo optimization for child components
+- Unused variables causing TypeScript warnings
+- Inefficient re-renders due to direct state mutations
+
+#### 3. **Code Quality Issues**
+- Mixed variable declarations (`let` vs `const`)
+- Inconsistent naming conventions
+- Hardcoded strings throughout the codebase
+- Missing PropTypes/TypeScript interfaces
+- Commented-out code blocks
+
+#### 4. **Modern React Anti-patterns**
+- Missing custom hooks for reusable logic
+- useEffect cleanup issues
+- No proper dependency arrays
+- Direct DOM manipulation with refs
+
+### Refactoring Plan
+
+#### Phase 1: Code Organization & Architecture
+1. **Extract Custom Hooks**
+   - `useDatabase()` - Database operations and state
+   - `useBluetooth()` - Bluetooth connection management
+   - `useParkingData()` - Parking records and statistics
+   - `useFileSystem()` - File operations
+
+2. **Create Service Layers**
+   - `DatabaseService.js` - Centralized database operations
+   - `PrinterService.js` - Printer formatting and operations
+   - `FileService.js` - File system operations
+   - `ConfigService.js` - App configuration management
+
+3. **Component Restructuring**
+   - Split Main.js into logical components
+   - Create container/presentational component pattern
+   - Extract reusable UI components
+
+#### Phase 2: State Management & Data Flow
+1. **Implement Context API**
+   - AppContext for global state
+   - Separate contexts for different concerns
+   - Proper state normalization
+
+2. **Optimize Database Operations**
+   - Implement connection pooling
+   - Add query optimization
+   - Cache frequently accessed data
+   - Add proper transaction handling
+
+#### Phase 3: Performance Optimization
+1. **React Optimization**
+   - Add React.memo to components
+   - Implement useCallback/useMemo where needed
+   - Optimize render cycles
+   - Remove unnecessary re-renders
+
+2. **Memory Management**
+   - Proper cleanup in useEffect
+   - Remove event listeners on unmount
+   - Optimize database connections
+
+#### Phase 4: Code Quality & Maintainability
+1. **Standardize Dependencies**
+   - Remove moment.js, keep only date-fns
+   - Consolidate UI libraries (choose between native-base and @rneui)
+   - Update to latest React Native practices
+
+2. **Error Handling & Logging**
+   - Implement centralized error handling
+   - Add proper logging service
+   - Create user-friendly error messages
+   - Add error boundaries
+
+3. **Constants & Configuration**
+   - Extract hardcoded values to constants
+   - Create configuration files
+   - Add environment-specific settings
+
+#### Phase 5: Modern React Patterns
+1. **Add TypeScript Support**
+   - Convert .js files to .tsx
+   - Add proper type definitions
+   - Create interfaces for data structures
+
+2. **Testing Infrastructure**
+   - Add unit tests for services
+   - Component testing with React Testing Library
+   - Integration tests for critical flows
+
+### Specific Optimizations
+
+#### Main.js Refactoring
+- Split into 5-6 smaller components
+- Extract business logic to custom hooks
+- Remove direct database calls from component
+- Implement proper error boundaries
+
+#### Database Layer
+- Create centralized database service
+- Add query builders for complex operations
+- Implement proper connection management
+- Add data validation layer
+
+#### UI Components
+- Create reusable components library
+- Standardize styling approach
+- Add accessibility features
+- Implement responsive design patterns
+
+#### Performance Improvements
+- Lazy load components where possible
+- Implement virtual scrolling for large lists
+- Add image optimization
+- Optimize bundle size
+
+### Benefits Expected
+- **50%+ reduction** in component complexity
+- **Improved performance** through optimized re-renders
+- **Better maintainability** with separated concerns
+- **Enhanced developer experience** with TypeScript
+- **Reduced bugs** through better error handling
+- **Easier testing** with modular architecture
+
+### Implementation Strategy
+1. Create new optimized files alongside existing ones
+2. Gradually migrate functionality
+3. Test each phase thoroughly
+4. Maintain backward compatibility
+5. Update documentation as we go
+
+This plan will transform the codebase into a modern, maintainable, and performant React Native application while preserving all existing functionality.
